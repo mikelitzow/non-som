@@ -194,7 +194,7 @@ lim <- range(r1, r2, r3)
 z <- r1   
 z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
 
-image.plot(x,y,z, col=my.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
+image.plot(x,y,z, col=new.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
 contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
 map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
 mtext("SLP-PDO 1949-1988", cex=0.8)
@@ -202,7 +202,7 @@ mtext("SLP-PDO 1949-1988", cex=0.8)
 z <- r2  
 z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
 
-image.plot(x,y,z, col=my.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
+image.plot(x,y,z, col=new.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
 contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
 map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
 mtext("SLP-PDO 1989-2013", cex=0.8)
@@ -210,18 +210,19 @@ mtext("SLP-PDO 1989-2013", cex=0.8)
 z <- r3  
 z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
 
-image.plot(x,y,z, col=my.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
+image.plot(x,y,z, col=new.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
 contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
 map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
 mtext("SLP-PDO 2014-2018", cex=0.8)
 
 # and npgo plots
-# using same limits for z!
+# using NEW limits for z!
 
+lim <- range(n1, n2, n3)
 z <- n1   
 z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
 
-image.plot(x,y,z, col=my.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
+image.plot(x,y,z, col=new.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
 contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
 map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
 mtext("SLP-NPGO 1950-1988", cex=0.8)
@@ -229,7 +230,7 @@ mtext("SLP-NPGO 1950-1988", cex=0.8)
 z <- n2  
 z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
 
-image.plot(x,y,z, col=my.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
+image.plot(x,y,z, col=new.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
 contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
 map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
 mtext("SLP-NPGO 1989-2013", cex=0.8)
@@ -237,7 +238,7 @@ mtext("SLP-NPGO 1989-2013", cex=0.8)
 z <- n3  
 z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
 
-image.plot(x,y,z, col=my.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
+image.plot(x,y,z, col=new.col, zlim=c(lim[1], -lim[1]), xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
 contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
 map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
 mtext("SLP-NPGO 2014-2018", cex=0.8)
