@@ -20,6 +20,7 @@ pdo <- melt(pdo, id.vars = "YEAR")
 pdo <- pdo[order(pdo$YEAR),]
 
 # and get FMA mean values
+pdo <- filter(pdo, variable %in% c("FEB", "MAR", "APR"))
 pdo.FMA <- tapply(pdo$value, pdo$YEAR, mean) 
 
 # load the SODA wind stress data
