@@ -30,18 +30,24 @@ npgo$win.yr <- ifelse(npgo$month %in% 11:12, npgo$Year+1, npgo$Year)
 win.npgo <- tapply(npgo$value, npgo$win.yr, mean)
 
 
-# load cce env data
-dat <- read.csv("cce.climate.csv")
+# # load cce env data
+# (blanking out my data processing steps here, just load the .csv file below)
+# dat <- read.csv("cce.climate.csv")
+# 
+# # restrict to 1951:2013!
+# # (this is the first year for which we have a winter mean for npgo)
+# dat <- dat %>%
+#   filter(year %in% 1951:2013)
+# 
+# # and drop the regional climate variables that are winter-spring means
+# drop <- grep("win_spr", colnames(dat))
+# dat <- dat[,-drop]
+# 
+# 
+# # save in this form
+# write.csv(dat, "cce.env.dat.csv")
 
-# restrict to 1951:2013!
-# (this is the first year for which we have a winter mean for npgo)
-dat <- dat %>%
-  filter(year %in% 1951:2013)
-
-# and drop the regional climate variables that are winter-spring means
-drop <- grep("win_spr", colnames(dat))
-dat <- dat[,-drop]
-
+dat <- read.csv("cce.env.dat.csv", row.names = 1)
 # add era term
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
@@ -130,31 +136,38 @@ ggplot(mod.out, aes(variable, est, fill=era)) + geom_hline(yintercept = 0, color
   scale_fill_manual(values=cb[c(2,6)]) 
 
 
-# and CalCOFI environmental data!
-cdat <- read.csv("CCE-nonsalmon-biology&climate.csv", row.names = 1)
+# # and CalCOFI environmental data!
+# # again, blanking out my data processing steps
+# cdat <- read.csv("CCE-nonsalmon-biology&climate.csv", row.names = 1)
+# 
+# # limit to Southern CCE
+# our.dat <- grep("SCC", colnames(cdat))
+# 
+# env.dat <- cdat[,our.dat]
+# head(env.dat)
+# 
+# # lots of TS w/o good pre-76/77 data - check this
+# ff <- function(x) sum(!is.na(x))
+# 
+# # count of pre-76/77 data 
+# keep <- apply(env.dat[rownames(env.dat) <= 1976,], 2, ff) >= 10
+# env.dat <- env.dat[rownames(env.dat) <=2012,keep]
+# 
+# env.dat$year <- rownames(env.dat)
+# 
+# dat <- env.dat %>%
+#   gather(key, value, -year)
+# 
+# # restrict to 1951:2013!
+# dat <- dat %>%
+#   filter(year %in% 1951:2013)  %>%
+#   spread(key, value)
+# 
+# # save in this form
+# write.csv(dat, "calcofi.env.dat.csv")
 
-# limit to Southern CCE
-our.dat <- grep("SCC", colnames(cdat))
-
-env.dat <- cdat[,our.dat]
-head(env.dat)
-
-# lots of TS w/o good pre-76/77 data - check this
-ff <- function(x) sum(!is.na(x))
-
-# count of pre-76/77 data 
-keep <- apply(env.dat[rownames(env.dat) <= 1976,], 2, ff) >= 10
-env.dat <- env.dat[rownames(env.dat) <=2012,keep]
-
-env.dat$year <- rownames(env.dat)
-
-dat <- env.dat %>%
-  gather(key, value, -year)
-
-# restrict to 1951:2013!
-dat <- dat %>%
-  filter(year %in% 1951:2013)  %>%
-  spread(key, value)
+# note that Mary is looking at providing a better set of CalCOFI physical data
+dat <- read.csv("calcofi.env.dat.csv", row.names = 1)
 
 # add era term
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
@@ -240,27 +253,31 @@ ggplot(filter(mod.out, system=="CalCOFI"), aes(variable, est, fill=era)) + geom_
 ############
 # and GOA env
 # load data...
-dat <- read.csv("/Users/MikeLitzow 1/Documents/R/time and climes/clim vars for ordination.csv", row.names=1)
+# dat <- read.csv("/Users/MikeLitzow 1/Documents/R/time and climes/clim vars for ordination.csv", row.names=1)
+# 
+# # put years into row names
+# rownames(dat) <- dat[,1]
+# dat <- dat[,-1]
+# 
+# # dropping AL and NPI as I think we will leave out these dynamics to keep the paper simple
+# # the relevant atmosphere-ocean dynamics have been addequately addressed in PRSB ms. for our purposes!
+# dat <- dat[,-c(1,2)]
+# 
+# head(dat)
+# 
+# # remove some extra  time series
+# dat <- dat[,-c(5,6,8,9,10,11,14,17)]
+# 
+# 
+# # change names to plot-friendly labels
+# colnames(dat) <- c("PDO", "NPGO", "SLP gradient", "Freshwater", "Wind stress", "Downwelling", "SST", "Advection", "SSH")
+# 
+# # and remove PDO/NPGO
+# dat <- dat[,-c(1,2)]
+# 
+# write.csv(dat, "goa.env.dat.csv")
 
-# put years into row names
-rownames(dat) <- dat[,1]
-dat <- dat[,-1]
-
-# dropping AL and NPI as I think we will leave out these dynamics to keep the paper simple
-# the relevant atmosphere-ocean dynamics have been addequately addressed in PRSB ms. for our purposes!
-dat <- dat[,-c(1,2)]
-
-head(dat)
-
-# remove some extra  time series
-dat <- dat[,-c(5,6,8,9,10,11,14,17)]
-
-
-# change names to plot-friendly labels
-colnames(dat) <- c("PDO", "NPGO", "SLP gradient", "Freshwater", "Wind stress", "Downwelling", "SST", "Advection", "SSH")
-
-# and remove PDO/NPGO
-dat <- dat[,-c(1,2)]
+dat <- read.csv("goa.env.dat.csv", row.names = 1)
 
 # add era term
 dat$era <- as.factor(ifelse(rownames(dat) <= 1988, 1, 2))
@@ -351,33 +368,37 @@ ggplot(filter(mod.out, system=="GOA"), aes(variable, est, fill=era)) + geom_hlin
 # EBS environment
 
 # now load EBS data
-setwd("/Users/MikeLitzow 1/Documents/R/climate scripts")
+# setwd("/Users/MikeLitzow 1/Documents/R/climate scripts")
+# 
+# ewidata <- tibble::as.tibble(read.csv("ewidata.csv", row.names=1))
+# setwd("/Users/MikeLitzow 1/Documents/R/FATE2 non-som")
+# 
+# keep <- grep("AKCLIM_EBS", ewidata$code)
+# 
+# ewidata <- ewidata[keep,]
+# dat = ewidata
+# 
+# # clean up codes
+# temp1 <- strsplit(as.character(dat$code),"AKCLIM_EBS_")
+# temp2 <- matrix(unlist(temp1), ncol=2, byrow=TRUE)
+# 
+# dat$code <- temp2[,2]
+# 
+# # remove bottom temp as it is too short
+# dat <- dat %>%
+#   filter(code != "BOTTOM.TEMP") %>%
+#   select(year, code, value)
+# 
+# names(dat)[2] <- "key"
+# 
+# # restrict to 1951:2013
+# dat <- dat %>%
+#   filter(year %in% 1951:2013) %>%
+#   spread(key, value)
+# 
+# write.csv(dat, "ebs.env.dat.csv")
 
-ewidata <- tibble::as.tibble(read.csv("ewidata.csv", row.names=1))
-setwd("/Users/MikeLitzow 1/Documents/R/FATE2 non-som")
-
-keep <- grep("AKCLIM_EBS", ewidata$code)
-
-ewidata <- ewidata[keep,]
-dat = ewidata
-
-# clean up codes
-temp1 <- strsplit(as.character(dat$code),"AKCLIM_EBS_")
-temp2 <- matrix(unlist(temp1), ncol=2, byrow=TRUE)
-
-dat$code <- temp2[,2]
-
-# remove bottom temp as it is too short
-dat <- dat %>%
-  filter(code != "BOTTOM.TEMP") %>%
-  select(year, code, value)
-
-names(dat)[2] <- "key"
-
-# restrict to 1951:2013
-dat <- dat %>%
-  filter(year %in% 1951:2013) %>%
-  spread(key, value)
+dat <- read.csv("ebs.env.dat.csv", row.names = 1)
 
 # add era term
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
@@ -477,7 +498,7 @@ for(i in seq(2,nrow(mod.out), by=2)){
 mod.out$reg.ord <- ifelse(mod.out$system=="EBS", 1, ifelse(mod.out$system=="GOA",2,3))
 mod.out$system <- reorder(mod.out$system, mod.out$reg.ord)
 
-# now I'm plotting these results together with p-values for era differences
+# now I'm plotting these results together with p-values for era differences (in red text)
 
 pdo.plot <- ggplot(filter(mod.out, incl.zero==FALSE, index=="PDO"), aes(variable, est, fill=era)) + geom_hline(yintercept = 0, color="dark grey") + 
   theme_linedraw() +
@@ -506,7 +527,7 @@ ggarrange(pdo.plot, npgo.plot, labels = c("a) PDO", "b) NPGO"), ncol=2, widths=c
 dev.off()
 
 # so era differences are weak outside GOA
-# noisy relationships w/ PDO & NPGO
+# generally noisy relationships w/ PDO & NPGO
 # but it also appears that the era differences are similar across region/index combinations
 # i.e., weaker or stronger in a given era
 # look at distributions of coefficients between eras...
