@@ -80,7 +80,7 @@ plot2$method <- "lmer"
 
 plot <- rbind(plot, plot2)
 
-png("method comparison", 4, 4, units="in", res=300)
+png("method comparison.png", 5, 5, units="in", res=300)
 ggplot(plot, aes(names, value, fill=era)) + 
   theme_linedraw() +
   geom_bar(position="dodge", stat="identity") +
