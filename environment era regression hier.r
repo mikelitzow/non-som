@@ -63,8 +63,6 @@ melted = dplyr::group_by(melted, variable) %>%
 # changing to include fixed effects...
 mod = rstanarm::stan_lmer(pdo ~ 1 + z_value + era:z_value + (1 + z_value + era:z_value|variable), data=melted)
 
-
-
 summary(mod)
 fit <- as.data.frame(mod)
 head(fit)
@@ -255,7 +253,6 @@ pdo.plot <- ggplot(filter(plot, index=="PDO"), aes(names, coef, fill=era)) + geo
   facet_wrap(~system, ncol=1, scales="free") + 
   theme(legend.position = 'top', legend.title = element_blank()) +
   scale_fill_manual(values=cb[c(2,6)]) 
-
 
 npgo.plot <- ggplot(filter(mod.out, incl.zero==FALSE, index=="NPGO"), aes(variable, est, fill=era)) + geom_hline(yintercept = 0, color="dark grey") + 
   theme_linedraw() +
