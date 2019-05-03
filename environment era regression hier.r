@@ -63,6 +63,8 @@ melted = dplyr::group_by(melted, variable) %>%
 # changing to include fixed effects...
 mod = rstanarm::stan_lmer(pdo ~ 1 + z_value + era:z_value + (1 + z_value + era:z_value|variable), data=melted)
 
+
+
 summary(mod)
 fit <- as.data.frame(mod)
 head(fit)
@@ -73,6 +75,7 @@ ggplot(plotfit, aes(slope, fill=era)) +
   geom_density(alpha=0.8) +
   theme(legend.position = c(0.2, 0.8))
 
+ggsave("posteriors signs unified.png")
 ggplot(plotfit, aes(slope, fill=era)) + 
   theme_linedraw() +
   geom_density(alpha=0.8) +
@@ -92,11 +95,14 @@ plot$names <- reorder(plot$names, rep(plot$coef[plot$era=="Before 1988/89"],2))
 plot$index <- "PDO"
 plot$system <- "EBS"
 
+
 ggplot(plot, aes(names, coef, fill=era)) + 
   theme_linedraw() +
   geom_bar(position="dodge", stat="identity") +
   theme(axis.text.x = element_text(angle = 45, hjust=1), axis.title.x = element_blank(),
         legend.position = c(0.2, 0.8), legend.title = element_blank())
+
+ggsave("example.png")
 
 # now npgo
 mod = rstanarm::stan_lmer(npgo ~ (1+ z_value + era:z_value|variable), data=melted)
