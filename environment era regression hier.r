@@ -1,3 +1,37 @@
+library(tidyverse)
+library(zoo)
+library(nlme)
+library(MARSS)
+library(MuMIn)
+library(ggpubr)
+library(reshape2)
+library(glmmTMB)
+library(rstanarm)
+library(lme4)
+library(rstan)
+
+# there are four regions that we're looking at: CalCOFI/southern CCE, Farallon/central CCE, GOA, and EBS
+
+download.file("http://jisao.washington.edu/pdo/PDO.latest", "~pdo")
+names <- read.table("~pdo", skip=30, nrows=1, as.is = T)
+pdo <- read.table("~pdo", skip=32, nrows=119, fill=T, col.names = names)
+pdo$YEAR <- 1900:(1899+nrow(pdo)) # drop asterisks!
+pdo <- pdo %>%
+  gather(month, value, -YEAR) %>%
+  arrange(YEAR)
+
+download.file("http://www.oces.us/npgo/npgo.php", "~npgo")
+
+npgo <- read.table("~npgo", skip=10, nrows=828, fill=T, col.names = c("Year", "month", "value"))
+
+# calculate NDJFM means for each index
+pdo$win.yr <- ifelse(pdo$month %in% c("NOV", "DEC"), pdo$YEAR+1, pdo$YEAR)
+win.pdo <- tapply(pdo$value, pdo$win.yr, mean)
+
+npgo$win.yr <- ifelse(npgo$month %in% 11:12, npgo$Year+1, npgo$Year)
+win.npgo <- tapply(npgo$value, npgo$win.yr, mean)
+
+# read in one of the env datasets
 dat <- read.csv("ebs.env.dat.csv", row.names = 1)
 
 # add era term
@@ -7,11 +41,31 @@ dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 dat$pdo <- win.pdo[match(dat$year, names(win.pdo))]
 dat$npgo <- win.npgo[match(dat$year, names(win.npgo))]
 
-# EW added this code for the hierarchical model
-library(reshape2)
-library(glmmTMB)
-library(rstanarm)
-library(lme4)
+# reshape with year, era, and pdo and npgo as the grouping variables
+melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
+melted$variable_era = paste0(melted$era,melted$variable)
+# standardize all the time series by variable -- so slopes are on same scale
+melted = dplyr::group_by(melted, variable) %>%
+  mutate(scale_x = scale(value))
+
+# create data for stan
+stan_data = list(era = as.numeric(melted$era),
+  y = melted$pdo,
+  variable = as.numeric(melted$variable),
+  n = nrow(melted),
+  n_levels = max(as.numeric(melted$variable)),
+  x = melted$scale_x)
+
+mod = stan(file="mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
+  pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio"),
+  control=list(adapt_delta=0.99, max_treedepth=20))
+
+pars = rstan::extract(mod,permuted=TRUE)
+
+ggplot(as.data.frame(pars), aes(100*exp(mu_ratio))) +
+  geom_density(fill="blue") + xlab("Avg change in slope (%) from Era 1 to Era 2")
+
+
 
 # trying a new approach:
 # include the fixed effect as an overall measure of the degree of association across
@@ -30,18 +84,15 @@ for(i in 1:length(vars)){
     filter(era==1)
   form <- as.formula(paste("pdo ~", vars[i], sep=""))
   mod <- lm(form, data=temp, na.action="na.exclude")
-  
-  # if slope is negative, multiply time series by -1
-  if(summary(mod)$coef[2,1] < 0) {dat[,colnames(dat)==vars[i]] <- -dat[,colnames(dat)==vars[i]]} 
-}
-  
 
-# reshape with year, era, and pdo and npgo as the grouping variables
-melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
-melted$variable_era = paste0(melted$era,melted$variable)
-# # standardize all the time series? 
-melted = dplyr::group_by(melted, variable) %>% 
-  mutate(z_value = scale(value))
+  # if slope is negative, multiply time series by -1
+  if(summary(mod)$coef[2,1] < 0) {dat[,colnames(dat)==vars[i]] <- -dat[,colnames(dat)==vars[i]]}
+}
+
+
+
+
+
 
 # fit model with random slopes by era:variable, same intercept
 # mod = glmmTMB::glmmTMB(pdo ~ 1 + (-1+z_value)|variable_era, data=melted)
@@ -49,8 +100,8 @@ melted = dplyr::group_by(melted, variable) %>%
 # coefs = data.frame(coef = ranef(mod)$cond$variable_era$z_value)
 # coefs$era = substr(rownames(ranef(mod)$cond$variable_era),1,1)
 # coefs$variable = substr(rownames(ranef(mod)$cond$variable_era),2,nchar(coefs$coef))
-# 
-# ggplot(coefs, aes(variable, coef, fill=era)) + 
+#
+# ggplot(coefs, aes(variable, coef, fill=era)) +
 #   theme_linedraw() +
 #   geom_bar(position="dodge", stat="identity")
 
@@ -68,31 +119,31 @@ fit <- as.data.frame(mod)
 head(fit)
 plotfit <- data.frame(slope=c(fit[,2], fit[,2] + fit[,3]), era=as.factor(rep(c(1,2), each=nrow(fit))))
 
-ggplot(plotfit, aes(slope, fill=era)) + 
+ggplot(plotfit, aes(slope, fill=era)) +
   theme_linedraw() +
   geom_density(alpha=0.8) +
   theme(legend.position = c(0.2, 0.8))
 
-ggplot(plotfit, aes(slope, fill=era)) + 
+ggplot(plotfit, aes(slope, fill=era)) +
   theme_linedraw() +
   geom_density(alpha=0.8) +
-  scale_fill_manual(values=cb[c(2,6)]) + 
+  scale_fill_manual(values=cb[c(2,6)]) +
   theme(legend.position = 'top', legend.title = element_blank()) +
-  xlab("Regression coefficient (absolute value)") 
+  xlab("Regression coefficient (absolute value)")
 
 # make plot-friendly label names
 names <- c("Spring SST", "Winter SST", "Summer NW wind", "Summer SE wind", "Winter NW wind", "Winter SE wind",
            "Ice 57.75N 164.5W", "Ice 58.75N 164.5W", "Ice 64.25N 163.5W")
 
 # make a df to hold results for plotting
-plot <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names, 
-                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable))) 
+plot <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names,
+                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable)))
 
 plot$names <- reorder(plot$names, rep(plot$coef[plot$era=="Before 1988/89"],2))
 plot$index <- "PDO"
 plot$system <- "EBS"
 
-ggplot(plot, aes(names, coef, fill=era)) + 
+ggplot(plot, aes(names, coef, fill=era)) +
   theme_linedraw() +
   geom_bar(position="dodge", stat="identity") +
   theme(axis.text.x = element_text(angle = 45, hjust=1), axis.title.x = element_blank(),
@@ -100,8 +151,8 @@ ggplot(plot, aes(names, coef, fill=era)) +
 
 # now npgo
 mod = rstanarm::stan_lmer(npgo ~ (1+ z_value + era:z_value|variable), data=melted)
-temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names, 
-                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable))) 
+temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names,
+                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable)))
 
 temp$names <- reorder(plot$names, rep(plot$coef[plot$era=="Before 1988/89"],2))
 temp$index <- "NPGO"
@@ -127,14 +178,14 @@ melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
 melted$variable_era = paste0(melted$era,melted$variable)
 
 
-# # standardize all the time series? 
-melted = dplyr::group_by(melted, variable) %>% 
+# # standardize all the time series?
+melted = dplyr::group_by(melted, variable) %>%
   mutate(z_value = scale(value))
 
 #pdo model
 mod = rstanarm::stan_lmer(pdo ~ (1+ z_value + era:z_value|variable), data=melted)
-temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names, 
-                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable))) 
+temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names,
+                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable)))
 
 temp$index <- "PDO"
 temp$system <- system
@@ -142,8 +193,8 @@ plot <- rbind(plot, temp)
 
 # #npgo model
 mod = rstanarm::stan_lmer(npgo ~ (1+ z_value + era:z_value|variable), data=melted)
-temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names, 
-                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable))) 
+temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names,
+                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable)))
 
 temp$index <- "NPGO"
 temp$system <- system
@@ -169,14 +220,14 @@ melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
 melted$variable_era = paste0(melted$era,melted$variable)
 
 
-# # standardize all the time series? 
-melted = dplyr::group_by(melted, variable) %>% 
+# # standardize all the time series?
+melted = dplyr::group_by(melted, variable) %>%
   mutate(z_value = scale(value))
 
 #pdo model
 mod = rstanarm::stan_lmer(pdo ~ (1+ z_value + era:z_value|variable), data=melted)
-temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names, 
-                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable))) 
+temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names,
+                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable)))
 
 temp$index <- "PDO"
 temp$system <- system
@@ -184,8 +235,8 @@ plot <- rbind(plot, temp)
 
 # #npgo model
 mod = rstanarm::stan_lmer(npgo ~ (1+ z_value + era:z_value|variable), data=melted)
-temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names, 
-                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable))) 
+temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names,
+                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable)))
 
 temp$index <- "NPGO"
 temp$system <- system
@@ -208,14 +259,14 @@ melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
 melted$variable_era = paste0(melted$era,melted$variable)
 
 
-# # standardize all the time series? 
-melted = dplyr::group_by(melted, variable) %>% 
+# # standardize all the time series?
+melted = dplyr::group_by(melted, variable) %>%
   mutate(z_value = scale(value))
 
 #pdo model
 mod = rstanarm::stan_lmer(pdo ~ (1+ z_value + era:z_value|variable), data=melted)
-temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names, 
-                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable))) 
+temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names,
+                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable)))
 
 temp$index <- "PDO"
 temp$system <- system
@@ -223,8 +274,8 @@ plot <- rbind(plot, temp)
 
 # #npgo model
 mod = rstanarm::stan_lmer(npgo ~ (1+ z_value + era:z_value|variable), data=melted)
-temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names, 
-                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable))) 
+temp <- data.frame(coef=c(coef(mod)$variable[,1], coef(mod)$variable[,1]+coef(mod)$variable[,2]), names=names,
+                   era=rep(c("Before 1988/89", "After 1988/89"), each=nrow(coef(mod)$variable)))
 
 temp$index <- "NPGO"
 temp$system <- system
@@ -241,22 +292,22 @@ plot$order <- ifelse(plot$era=="Before 1988/89", 1, 2)
 plot$names <- reorder(plot$names, plot$order)
 
 
-pdo.plot <- ggplot(filter(plot, index=="PDO"), aes(names, coef, fill=era)) + geom_hline(yintercept = 0, color="dark grey") + 
+pdo.plot <- ggplot(filter(plot, index=="PDO"), aes(names, coef, fill=era)) + geom_hline(yintercept = 0, color="dark grey") +
   theme_linedraw() +
-  geom_bar(position=dodge, stat="identity") + 
-  xlab("") + 
-  ylab("Coefficient") + 
-  facet_wrap(~system, ncol=1, scales="free") + 
+  geom_bar(position=dodge, stat="identity") +
+  xlab("") +
+  ylab("Coefficient") +
+  facet_wrap(~system, ncol=1, scales="free") +
   theme(legend.position = 'top', legend.title = element_blank()) +
-  scale_fill_manual(values=cb[c(2,6)]) 
+  scale_fill_manual(values=cb[c(2,6)])
 
 
-npgo.plot <- ggplot(filter(mod.out, incl.zero==FALSE, index=="NPGO"), aes(variable, est, fill=era)) + geom_hline(yintercept = 0, color="dark grey") + 
+npgo.plot <- ggplot(filter(mod.out, incl.zero==FALSE, index=="NPGO"), aes(variable, est, fill=era)) + geom_hline(yintercept = 0, color="dark grey") +
   theme_linedraw() +
-  geom_bar(position=dodge, stat="identity") + 
-  geom_errorbar(aes(ymax=upper, ymin=lower), position=dodge, width=0.5) + xlab("") + 
-  ylab("Coefficient") + 
-  facet_wrap(~system, ncol=1, scales="free") + 
+  geom_bar(position=dodge, stat="identity") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), position=dodge, width=0.5) + xlab("") +
+  ylab("Coefficient") +
+  facet_wrap(~system, ncol=1, scales="free") +
   theme(legend.position = 'top', legend.title = element_blank()) +
   scale_fill_manual(values=cb[c(2,6)]) +
-  geom_text(aes(y=1,label = as.character(round(P,3))), color="red") 
+  geom_text(aes(y=1,label = as.character(round(P,3))), color="red")
