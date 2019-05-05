@@ -10,8 +10,7 @@ library(rstanarm)
 library(lme4)
 library(rstan)
 
-# there are four regions that we're looking at: CalCOFI/southern CCE, Farallon/central CCE, GOA, and EBS
-
+# load pdo/npgo 
 download.file("http://jisao.washington.edu/pdo/PDO.latest", "~pdo")
 names <- read.table("~pdo", skip=30, nrows=1, as.is = T)
 pdo <- read.table("~pdo", skip=32, nrows=119, fill=T, col.names = names)
@@ -31,9 +30,9 @@ win.pdo <- tapply(pdo$value, pdo$win.yr, mean)
 npgo$win.yr <- ifelse(npgo$month %in% 11:12, npgo$Year+1, npgo$Year)
 win.npgo <- tapply(npgo$value, npgo$win.yr, mean)
 
-# read in one of the env datasets
+# there are five regions that we're looking at: CalCOFI/southern CCE, Farallon/central CCE, northern CCE, GOA, and EBS
+# load 'em!
 dat <- read.csv("ebs.env.dat.csv", row.names = 1)
-
 # add era term
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
@@ -45,27 +44,190 @@ dat$npgo <- win.npgo[match(dat$year, names(win.npgo))]
 melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
 melted$variable_era = paste0(melted$era,melted$variable)
 # standardize all the time series by variable -- so slopes are on same scale
-melted = dplyr::group_by(melted, variable) %>%
+m1 = dplyr::group_by(melted, variable) %>%
   mutate(scale_x = scale(value))
+m1$system <- "EBS"
 
-# create data for stan
-stan_data = list(era = as.numeric(melted$era),
-  y = melted$pdo,
-  variable = as.numeric(melted$variable),
-  n = nrow(melted),
-  n_levels = max(as.numeric(melted$variable)),
-  x = melted$scale_x)
+####
 
-mod = stan(file="mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
-  pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio"),
-  control=list(adapt_delta=0.99, max_treedepth=20))
+dat <- read.csv("goa.env.dat.csv", row.names = 1)
+dat$year <- rownames(dat)
+dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
+dat$year <- as.numeric(dat$year)
 
-pars = rstan::extract(mod,permuted=TRUE)
+# and pdo/npgo
+dat$pdo <- win.pdo[match(dat$year, names(win.pdo))]
+dat$npgo <- win.npgo[match(dat$year, names(win.npgo))]
 
-ggplot(as.data.frame(pars), aes(100*exp(mu_ratio))) +
-  geom_density(fill="blue") + xlab("Avg change in slope (%) from Era 1 to Era 2")
+# reshape with year, era, and pdo and npgo as the grouping variables
+melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
+melted$variable_era = paste0(melted$era,melted$variable)
+# standardize all the time series by variable -- so slopes are on same scale
+m2 = dplyr::group_by(melted, variable) %>%
+  mutate(scale_x = scale(value))
+m2$system <- "GOA"
 
+#########
 
+dat <- read.csv("cce.env.dat.csv", row.names = 1)
+
+dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
+
+# and pdo/npgo
+dat$pdo <- win.pdo[match(dat$year, names(win.pdo))]
+dat$npgo <- win.npgo[match(dat$year, names(win.npgo))]
+
+# reshape with year, era, and pdo and npgo as the grouping variables
+melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
+melted$variable_era = paste0(melted$era,melted$variable)
+# standardize all the time series by variable -- so slopes are on same scale
+m3 = dplyr::group_by(melted, variable) %>%
+  mutate(scale_x = scale(value))
+m3$system <- "Central CCE"
+
+###################
+
+dat <- read.csv("calcofi.env.dat.csv", row.names = 1)
+
+dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
+
+# and pdo/npgo
+dat$pdo <- win.pdo[match(dat$year, names(win.pdo))]
+dat$npgo <- win.npgo[match(dat$year, names(win.npgo))]
+
+# reshape with year, era, and pdo and npgo as the grouping variables
+melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
+melted$variable_era = paste0(melted$era,melted$variable)
+# standardize all the time series by variable -- so slopes are on same scale
+m4 = dplyr::group_by(melted, variable) %>%
+  mutate(scale_x = scale(value))
+m4$system <- "Southern CCE"
+
+###########################
+
+dat <- read.csv("ncc.env.dat.csv", row.names = 1)
+
+dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
+
+# and pdo/npgo
+dat$pdo <- win.pdo[match(dat$year, names(win.pdo))]
+dat$npgo <- win.npgo[match(dat$year, names(win.npgo))]
+
+# reshape with year, era, and pdo and npgo as the grouping variables
+melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
+melted$variable_era = paste0(melted$era,melted$variable)
+# standardize all the time series by variable -- so slopes are on same scale
+m5 = dplyr::group_by(melted, variable) %>%
+  mutate(scale_x = scale(value))
+m5$system <- "Northern CCE"
+
+##############
+
+melted <- rbind(m1, m2, m3, m4, m5)
+melted$year <- as.numeric(melted$year)
+melted$variable <- as.factor(melted$variable)
+melted$variable_era <- as.factor(melted$variable_era)
+
+model.data = data.frame()
+
+levels.syst <- as.factor(unique(melted$system))
+
+for(s in levels.syst) {
+  
+ # s <- levels.syst[1]
+  
+  temp <- melted %>%
+    filter(system==s)
+  temp <- na.omit(temp)
+  # create data for stan
+  stan_data = list(era = as.numeric(temp$era),
+                   y = temp$pdo,
+                   variable = as.numeric(temp$variable),
+                   n = nrow(temp),
+                   n_levels = max(as.numeric(temp$variable)),
+                   x = temp$scale_x)
+  
+  mod = stan(file="mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
+             pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio"),
+             control=list(adapt_delta=0.99, max_treedepth=20))
+  
+  pars = rstan::extract(mod,permuted=TRUE)
+
+    model.data = rbind(model.data,
+                       data.frame(system=s, ratio=pars$mu_ratio))
+
+  }
+
+# order the systems north-south
+model.data$order <- ifelse(model.data$system=="EBS", 1, 
+                           ifelse(model.data$system=="GOA", 2, 
+                                  ifelse(model.data$system=="Northern CCE", 3,
+                                         ifelse(model.data$system=="Central CCE", 4, 5))))
+model.data$system <- reorder(model.data$system, model.data$order)
+
+cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+pdo.data <- model.data
+
+pdo.plot <- ggplot(pdo.data, aes(100*ratio)) +
+  theme_linedraw() +
+  geom_density(fill=cb[3]) + xlab("Avg change in slope (%) from Era 1 to Era 2") +
+  facet_wrap(~system, ncol=1) +
+  geom_vline(xintercept=0) + 
+  ggtitle("a) PDO")
+
+#################
+## and the same thing for npgo
+model.data <- data.frame()
+for(s in levels.syst) {
+  
+  # s <- levels.syst[1]
+  
+  temp <- melted %>%
+    filter(system==s)
+  temp <- na.omit(temp)
+  # create data for stan
+  stan_data = list(era = as.numeric(temp$era),
+                   y = temp$npgo,
+                   variable = as.numeric(temp$variable),
+                   n = nrow(temp),
+                   n_levels = max(as.numeric(temp$variable)),
+                   x = temp$scale_x)
+  
+  mod = stan(file="mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
+             pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio"),
+             control=list(adapt_delta=0.99, max_treedepth=20))
+  
+  pars = rstan::extract(mod,permuted=TRUE)
+  
+  model.data = rbind(model.data,
+                     data.frame(system=s, ratio=pars$mu_ratio))
+  
+}
+
+# order the systems north-south
+model.data$order <- ifelse(model.data$system=="EBS", 1, 
+                           ifelse(model.data$system=="GOA", 2, 
+                                  ifelse(model.data$system=="Northern CCE", 3,
+                                         ifelse(model.data$system=="Central CCE", 4, 5))))
+model.data$system <- reorder(model.data$system, model.data$order)
+
+npgo.data <- model.data
+
+npgo.plot <- ggplot(npgo.data, aes(100*ratio)) +
+  theme_linedraw() +
+  geom_density(fill=cb[3]) + xlab("Avg change in slope (%) from Era 1 to Era 2") +
+  facet_wrap(~system, ncol=1) +
+  geom_vline(xintercept=0) + 
+  ggtitle("b) NPGO")
+
+png("env regression change pdo-npgo slope.png", 7, 9, units="in", res=300)
+ggarrange(pdo.plot, npgo.plot, ncol=2)
+dev.off()
+
+########################
+# everything below is older approach
+########################
 
 # trying a new approach:
 # include the fixed effect as an overall measure of the degree of association across
