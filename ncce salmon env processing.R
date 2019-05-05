@@ -9,6 +9,7 @@ bifur <- read.csv("bifurcation-index.csv", row.names = 1, skip=15)
 head(bifur)
 
 # upwelling
+upwell.dat<-read.csv("upwelling_PFEL.csv")
 mod.upwell.dat<-arrange(upwell.dat,year,lat_n, lon_w)
 
 mod.upwell.dat$prev.nov = NA
@@ -60,7 +61,7 @@ x; y
 SST <- ncvar_get(nc, "sst")
 
 # extract dates
-ncvar_get(nc, "time")   # seconds since 1-1-1970
+# seconds since 1-1-1970
 raw <- ncvar_get(nc, "time")
 h <- raw/(24*60*60)
 d <- dates(h, origin = c(1,1,1970))
@@ -90,7 +91,7 @@ map('world2Hires',fill=F,xlim=c(130,250), ylim=c(20,66),add=T, lwd=2)
 # blank out the ones we don't want
 
 blank <- c("N50E230", "N48E230", "N48E232", 
-           "N46E230", "N46E232", "N46E234")
+           "N46E230", "N46E232", "N46E234", "N54E230")
 
 SST[,blank] <- NA
 
