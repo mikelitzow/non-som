@@ -214,7 +214,7 @@ model.data$system <- reorder(model.data$system, model.data$order)
 
 npgo.data <- model.data
 
-npgo.plot <- ggplot(npgo.data, aes(100*ratio)) +
+npgo.plot <- ggplot(npgo.data, aes(100*exp(ratio))) +
   theme_linedraw() +
   geom_density(fill=cb[3]) + xlab("Avg change in slope (%) from Era 1 to Era 2") +
   facet_wrap(~system, ncol=1) +
