@@ -188,6 +188,6 @@ npgo.plot <- ggplot(npgo.data, aes(ratio/100)) +
   xlim(c(0,4.5)) +
   ggtitle("b) NPGO")
 
-png("biol regression change pdo-npgo slope.png", 7, 9, units="in", res=300)
+png("biol regression change pdo-npgo slope.png", 7, 7, units="in", res=300)
 ggarrange(pdo.plot, npgo.plot, ncol=2)
 dev.off()
