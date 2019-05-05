@@ -154,7 +154,7 @@ for(s in levels.syst) {
   pars = rstan::extract(mod,permuted=TRUE)
 
     model.data = rbind(model.data,
-                       data.frame(system=s, ratio=pars$mu_ratio))
+                       data.frame(system=s, ratio=100*exp(pars$mu_ratio)))
 
   }
 
@@ -169,11 +169,12 @@ cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E
 
 pdo.data <- model.data
 
-pdo.plot <- ggplot(pdo.data, aes(100*ratio)) +
+pdo.plot <- ggplot(pdo.data, aes(ratio/100)) + # just removing % for now
   theme_linedraw() +
-  geom_density(fill=cb[3]) + xlab("Avg change in slope (%) from Era 1 to Era 2") +
+  geom_density(fill=cb[3]) + xlab("Avg ratio: Era 1 slope / Era 2 slope") +
   facet_wrap(~system, ncol=1) +
-  geom_vline(xintercept=0) + 
+  xlim(c(0,2)) +
+  geom_vline(xintercept = 1)+ 
   ggtitle("a) PDO")
 
 #################
@@ -201,7 +202,7 @@ for(s in levels.syst) {
   pars = rstan::extract(mod,permuted=TRUE)
   
   model.data = rbind(model.data,
-                     data.frame(system=s, ratio=pars$mu_ratio))
+                     data.frame(system=s, ratio=100*exp(pars$mu_ratio)))
   
 }
 
@@ -214,11 +215,12 @@ model.data$system <- reorder(model.data$system, model.data$order)
 
 npgo.data <- model.data
 
-npgo.plot <- ggplot(npgo.data, aes(100*exp(ratio))) +
+npgo.plot <- ggplot(npgo.data, aes(ratio/100)) +
   theme_linedraw() +
-  geom_density(fill=cb[3]) + xlab("Avg change in slope (%) from Era 1 to Era 2") +
+  geom_density(fill=cb[3]) + xlab("Avg ratio: Era 1 slope / Era 2 slope") +
   facet_wrap(~system, ncol=1) +
-  geom_vline(xintercept=0) + 
+  geom_vline(xintercept=1) + 
+  xlim(c(0,4.5)) +
   ggtitle("b) NPGO")
 
 png("env regression change pdo-npgo slope.png", 7, 9, units="in", res=300)
