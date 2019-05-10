@@ -3,6 +3,7 @@ library(chron)
 library(fields)
 library(maps)
 library(mapdata)
+library(reshape2)
 
 bifur <- read.csv("bifurcation-index.csv", row.names = 1, skip=15)
 
@@ -144,6 +145,17 @@ temp.yr <- yr[m %in% c("Nov", "Dec", "Jan", "Feb", "Mar")]
 
 win.SST <- tapply(temp, temp.yr, mean, na.rm=T)
 
+#####
+# and add spring physical transition data from NWFSC
+trans.dat <- read.csv("Bakun_Anomaly_69to18.csv")
+colnames(trans.dat) <- c("year", "value")
+
+# check
+ggplot(trans.dat, aes(year, value)) +
+  geom_bar(position="dodge", stat="identity")
+
+# looks right!
+
 ncc.dat <- data.frame(year=1950:2013, 
                       win.sst=win.SST[names(win.SST) %in% 1950:2013], 
                       spr.sum.sst=spr.sum.SST[names(spr.sum.SST) %in% 1950:2013],
@@ -151,6 +163,7 @@ ncc.dat <- data.frame(year=1950:2013,
                       win.UW.51=mean.uw$uw.win.51[match(c(1950:2013), mean.uw$year)],
                       spr.sum.UW.51=mean.uw$uw.spr.sum.51[match(c(1950:2013), mean.uw$year)],
                       win.UW.48=mean.uw$uw.win.48[match(c(1950:2013), mean.uw$year)],
-                      spr.sum.UW.48=mean.uw$uw.spr.sum.48[match(c(1950:2013), mean.uw$year)])
+                      spr.sum.UW.48=mean.uw$uw.spr.sum.48[match(c(1950:2013), mean.uw$year)],
+                      transition=trans.dat$value[match(c(1950:2013), trans.dat$year)])
 
 write.csv(ncc.dat, "ncc.env.dat.csv")
