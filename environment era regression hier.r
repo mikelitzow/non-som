@@ -87,7 +87,7 @@ m3$system <- "Central CCE"
 
 ###################
 
-dat <- read.csv("calcofi.env.dat.csv", row.names = 1)
+dat <- read.csv("calcofi.phys.gam.csv", row.names = 1)
 
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
