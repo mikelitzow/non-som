@@ -26,7 +26,6 @@ raw <- ncvar_get(nc.slp, "TIME")  # seconds since 1-1-1970
 d <- dates(raw, origin = c(1,1,0001))
 yr <- years(d)
 
-
 x <- ncvar_get(nc.slp, "LON53_101")
 y <- ncvar_get(nc.slp, "LAT45_69")
 
@@ -59,78 +58,8 @@ pdo <- pdo %>%
   arrange(YEAR)
 
 # load npgo
-download.file("http://www.oces.us/npgo/npgo.php", "~npgo")
+# download.file("http://www.oces.us/npgo/npgo.php", "~npgo")
 npgo <- read.table("~npgo", skip=10, nrows=828, fill=T, col.names = c("Year", "month", "value"))
-
-# load SST
-# load ERSSTv5 data
-download.file("https://coastwatch.pfeg.noaa.gov/erddap/griddap/nceiErsstv5.nc?sst[(1950-01-01):1:(2019-03-01)][(0.0):1:(0.0)][(30):1:(66)][(150):1:(250)]", "~updated.sst")
-# uncomment that line to download the data
-
-nc <- nc_open("~updated.sst")
-
-# get lat/long
-x.t <- ncvar_get(nc, "longitude")
-y.t <- ncvar_get(nc, "latitude")
-lat.t <- rep(y.t, length(x.t))   # Vector of latitudes
-lon.t <- rep(x.t, each = length(y.t))   # Vector of longitudes
-
-# assign dates
-raw <- ncvar_get(nc, "time") # seconds since January 1, 1970
-h <- raw/(24*60*60)
-d.t <- dates(h, origin = c(1,1,1970))
-
-# year for processing later
-m <- as.numeric(months(d.t))
-yr <- as.numeric(as.character(years(d.t)))
-
-# get required sst data
-SST <- ncvar_get(nc, "sst")
-
-# need to change to matrix for easier use
-SST <- aperm(SST, 3:1) # transpose array
-
-SST <- matrix(SST, nrow=dim(SST)[1], ncol=prod(dim(SST)[2:3]))  # Change to matrix
-
-# plot to check
-z <- colMeans(SST)   # replace elements NOT corresponding to land with loadings!
-z <- t(matrix(z, length(y.t)))  # Convert vector to matrix and transpose for plotting
-image(x.t,y.t,z, col=tim.colors(64), xlab = "", ylab = "", yaxt="n", xaxt="n")
-contour(x.t,y.t,z, add=T, col="white",vfont=c("sans serif", "bold"))
-map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
-
-# set names
-dimnames(SST) <- list(as.character(d.t), paste("N", lat.t, "E", lon.t, sep=""))
-
-###########################
-# calculate the various time series
-###########################
-
-# first, mean winter temp
-
-f <- function(x) tapply(x, m[yr %in% 1951:1980], mean)  # function to compute monthly means for a single time series
-
-mu <- apply(SST[yr %in% 1951:1980,], 2, f)	# Compute monthly means for each time series (location)
-
-mu <- mu[rep(1:12, floor(length(d.t)/12)),] 
-
-xtra <- 12*((length(d.t)/12)-floor(length(d.t)/12))
-
-mu <- rbind(mu, mu[1:xtra,])
-
-weights <-  sqrt(cos(lat.t*pi/180))
-ff <- function(x) weighted.mean(x, w=weights, na.rm=T)
-
-SST.anom <- SST-mu
-SST.anomTS <- apply(SST.anom,1,ff)   # Compute monthly anomalies!
-
-dec.yr.t <- as.numeric(as.character(yr)) + (as.numeric(m)-0.5)/12
-
-plot(dec.yr.t, SST.anomTS, type="l")
-abline(h=0)
-
-abline(h=0)
-abline(v=c(1989, 2014), lty=2)
 
 
 # now, AL sd
@@ -168,19 +97,13 @@ SLP.ALanom <- rowMeans(SLP.ALanom, na.rm=T)
 # smooth with 11-m rolling mean
 SLP.sm <- rollmean(SLP.ALanom,11,fill=NA)
 
-# and get the rolling 21-yr (253-mo) sd
-SLP.sd <- rollapply(SLP.sm, 253, sd, fill=NA)
-
 dec.yr <- as.numeric(as.character(yr))+(as.numeric(m)-0.5)/12
 
 plot(dec.yr, SLP.sm, type="l")
 plot(dec.yr, SLP.sd, type="l")
 
-# put together time series for DFA and plots
-
-dfa.dat <- data.frame(dec.yr=dec.yr, year=as.numeric(as.character(yr)), month=as.numeric(m), sst=SST.anom[match(dec.yr, dec.yr.t)], AL.sd=SLP.sd, PDO.NPGO.cor=NA, SLP.PDO.NS=NA, SLP.NPGO=NA)
-plot(dfa.dat$dec.yr,dfa.dat$sst, type="l")
-plot(dec.yr.t, SST.anom, type="l")
+# put together time series plots
+plot.dat <- data.frame(dec.yr=dec.yr, year=as.numeric(as.character(yr)), month=as.numeric(m), AL.sd=SLP.sd, PDO.NPGO.cor=NA, SLP.PDO.NS=NA, SLP.NPGO=NA)
 
 # and get full-field SD values by era to plot
 
@@ -200,59 +123,9 @@ SLP.sm <- apply(SLPanom, 2, ff)
 
 SLPsd1 <- apply(SLPanom[yr<=1988,], 2, sd, na.rm=T)
 SLPsd2 <- apply(SLPanom[yr %in% 1989:2013,], 2, sd, na.rm=T)
-SLPsd3 <- apply(SLPanom[yr >= 2014,], 2, sd, na.rm=T)
-
-lim <- range(SLPsd1, SLPsd2)
-
-xx <- c(186.25, 186.25, 206, 206, 186.25)
-yy <- c(46.25, 56.25, 56.25, 46.25, 46.25)
-
-# plot to check
- par(mfrow=c(1,2))
+SLPsd.diff <- SLPsd2-SLPsd1
 
 
-z <- SLPsd1   # replace elements NOT corresponding to land with loadings!
-z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
-image(x,y,z, col=tim.colors(64), xlab = "", ylab = "", zlim=lim)
-contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
-map('world2Hires', 'Canada', fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3")
-map('world2Hires', 'usa',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'USSR',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Japan',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Mexico',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'China',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,80),add=T, lwd=1)
-mtext("1948-1988")
-lines(xx,yy, lwd=1.5, col="magenta")
-
-z <- SLPsd2   # replace elements NOT corresponding to land with loadings!
-z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
-image(x,y,z, col=tim.colors(64), xlab = "", ylab = "", yaxt="n", xaxt="n", zlim=lim)
-contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
-map('world2Hires', 'Canada', fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3")
-map('world2Hires', 'usa',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'USSR',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Japan',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Mexico',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'China',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,80),add=T, lwd=1)
-mtext("1989-2013")
-lines(xx,yy, lwd=1.5, col="magenta")
-
-# now pdo-npgo correlations
-pdoTS <-pdo[601:1425,]
-npgoTS <- npgo[1:825,]
-rownames(pdoTS) <- rownames(npgoTS) <- 1:nrow(pdoTS)
-pdo.npgo <- NA
-
-for(i in 127:(nrow(pdoTS)-126)){
- # i <- nrow(pdoTS)-126
-  pdo.npgo[(i-126)] <- cor(pdoTS$value[(i-126):(i+126)], npgoTS$value[(i-126):(i+126)])
-  
-}
-
-View(dfa.dat)
-dfa.dat$PDO.NPGO.cor[151:723] <- pdo.npgo
 
 # and attempt some plots that depict the declining independent predictive skill of the NPGO
 # reload SST
@@ -744,8 +617,8 @@ for(i in 127:(nrow(dat)-126)){
 
 dat$pdoNS <- dat$pdo.regr1/dat$pdo.regr2
   
-dfa.dat$SLP.PDO.NS  <- dat$pdoNS[match(dfa.dat$dec.yr, dat$year)]
-dfa.dat$SLP.NPGO  <- dat$npgo.regr[match(dfa.dat$dec.yr, dat$year)]
+plot.dat$SLP.PDO.NS  <- dat$pdoNS[match(plot.dat$dec.yr, dat$year)]
+plot.dat$SLP.NPGO  <- dat$npgo.regr[match(plot.dat$dec.yr, dat$year)]
 
 plot.dat <- dat %>%
   select(year, pdo.regr1, pdo.regr2, npgo.regr) %>%
@@ -771,23 +644,7 @@ ggplot(plot.dat, aes(year, value)) +
 
 
 
-# sst time series plot
-use.dat <- data.frame(yr=dec.yr.t, sst=SST.anomTS)
-use.dat$era <- as.factor(ifelse(use.dat$yr<1989,1,2))
 
-pred.sst1 <- predict(lm(sst ~ yr:era + era, data=use.dat))
-
-pred.sst2 <- predict(gam(sst ~ s(yr), data=use.dat))
-
-pred.sst3 <- rollmean(SST.anomTS, 133, fill=NA)
-
-png("ne pacific sst plot.png", 5,4, units="in", res=300)
-par(mar=c(4,4,1.5,1),las=1)
-plot(dec.yr.t, SST.anomTS, type="l", xlab="", ylab="ºC wrt 1951-1980", xlim=xlim, col=cb[6])
-lines(dec.yr.t, pred.sst2, col="red")
-abline(h=0)
-abline(v=1989, lty=2)
-dev.off()
 
 
 
@@ -1025,7 +882,7 @@ mtext("k", adj=0.05, line=-1.4, cex=1)
 
 par(mar=c(1.5,3,1.5,1))
 
-plot(dfa.dat$dec.yr, dfa.dat$PDO.NPGO.cor, type="l", xlab="", ylab="PDO-NPGO correlation", xlim=xlim, col=cb[6])
+plot(plot.dat$dec.yr, plot.dat$PDO.NPGO.cor, type="l", xlab="", ylab="PDO-NPGO correlation", xlim=xlim, col=cb[6])
 abline(h=0)
 abline(v=1989, lty=2)
 mtext("l", adj=0.05, line=-1.4, cex=1)
@@ -1303,7 +1160,7 @@ mtext("n", adj=0.05, line=-1.4, cex=1.1)
 
 par(mar=c(1.5,3,1.5,1))
 
-plot(dfa.dat$dec.yr, dfa.dat$PDO.NPGO.cor, type="l", xlab="", ylab="PDO-NPGO correlation", xlim=xlim, col=cb[6])
+plot(plot.dat$dec.yr, plot.dat$PDO.NPGO.cor, type="l", xlab="", ylab="PDO-NPGO correlation", xlim=xlim, col=cb[6])
 abline(h=0)
 abline(v=1989, lty=2)
 mtext("o", adj=0.05, line=-1.4, cex=1.1)
