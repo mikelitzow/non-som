@@ -97,6 +97,9 @@ SLP.ALanom <- rowMeans(SLP.ALanom, na.rm=T)
 # smooth with 11-m rolling mean
 SLP.sm <- rollmean(SLP.ALanom,11,fill=NA)
 
+# and get the rolling 21-yr (253-mo) sd
+SLP.sd <- rollapply(SLP.sm, 253, sd, fill=NA)
+
 dec.yr <- as.numeric(as.character(yr))+(as.numeric(m)-0.5)/12
 
 plot(dec.yr, SLP.sm, type="l")
@@ -125,169 +128,10 @@ SLPsd1 <- apply(SLPanom[yr<=1988,], 2, sd, na.rm=T)
 SLPsd2 <- apply(SLPanom[yr %in% 1989:2013,], 2, sd, na.rm=T)
 SLPsd.diff <- SLPsd2-SLPsd1
 
-
-
-# and attempt some plots that depict the declining independent predictive skill of the NPGO
-# reload SST
-nc <- nc_open("~updated.sst")
-
-# get lat/long
-x.t <- ncvar_get(nc, "longitude")
-y.t <- ncvar_get(nc, "latitude")
-lat.t <- rep(y.t, length(x.t))   # Vector of latitudes
-lon.t <- rep(x.t, each = length(y.t))   # Vector of longitudes
-
-# assign dates
-raw <- ncvar_get(nc, "time") # seconds since January 1, 1970
-h <- raw/(24*60*60)
-d.t <- dates(h, origin = c(1,1,1970))
-
-# year for processing later
-m <- as.numeric(months(d.t))
-yr <- as.numeric(as.character(years(d.t)))
-
-# get required sst data
-SST <- ncvar_get(nc, "sst")
-
-# need to change to matrix for easier use
-SST <- aperm(SST, 3:1) # transpose array
-
-SST <- matrix(SST, nrow=dim(SST)[1], ncol=prod(dim(SST)[2:3]))  # Change to matrix
-
-# plot to check
-z <- colMeans(SST)   # replace elements NOT corresponding to land with loadings!
-z <- t(matrix(z, length(y.t)))  # Convert vector to matrix and transpose for plotting
-image(x.t,y.t,z, col=tim.colors(64), xlab = "", ylab = "", yaxt="n", xaxt="n")
-contour(x.t,y.t,z, add=T, col="white",vfont=c("sans serif", "bold"))
-map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
-
-# set names
-dimnames(SST) <- list(as.character(d.t), paste("N", lat.t, "E", lon.t, sep=""))
-
-
-f <- function(x) tapply(x, m[yr %in% 1951:1980], mean)  # function to compute monthly means for a single time series
-
-mu <- apply(SST[yr %in% 1951:1980,], 2, f)	# Compute monthly means for each time series (location)
-
-mu <- mu[rep(1:12, floor(length(d.t)/12)),] 
-
-xtra <- 12*((length(d.t)/12)-floor(length(d.t)/12))
-
-mu <- rbind(mu, mu[1:xtra,])
-
-SST.anom <- SST-mu
-
-# and remove land
-land <- is.na(colMeans(SST.anom))
-SST.anom <- SST.anom[,!land]
-
-# separate into 1950:1988 and 1989:2013
-SST.anom1 <- SST.anom[yr <= 1988,]
-SST.anom2 <- SST.anom[yr %in% 1989:2013,]
-
-# and separate pdo/npgo to same periods
-pdo1 <- pdo$value[pdo$YEAR %in% 1950:1988]
-pdo2 <- pdo$value[pdo$YEAR %in% 1989:2013]
-
-npgo1 <- npgo$value[npgo$Year %in% 1950:1988]
-npgo2 <- npgo$value[npgo$Year %in% 1989:2013]
-
-
-# look at NPGO regression on SSTa
-npgo.sst.regr1 <- npgo.sst.regr2 <- NA
-
-for(i in 1:ncol(SST.anom1)){
-  # i <- 1
-  mod <- lm(SST.anom1[,i] ~ npgo1)
-  npgo.sst.regr1[i] <- summary(mod)$coefficients[2,1]
-  
-  mod <- lm(SST.anom2[,i] ~ npgo2)
-  npgo.sst.regr2[i] <- summary(mod)$coefficients[2,1]
-}
-
-# plot
-
-lim <- range(npgo.sst.regr1, npgo.sst.regr2)
-
-par(mfrow=c(2,2), mar=c(0.5, 0.5,2,2))
-z <- rep(NA, ncol(SST))
-
-z[!land] <- npgo.sst.regr1
-
-z <- t(matrix(z, length(y.t)))  # Convert vector to matrix and transpose for plotting
-image.plot(x.t,y.t,z, col=new.col, zlim=c(lim[1], -lim[1]), ylim=c(20,68),
-           xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
-
-contour(x.t,y.t,z, add=T, col="grey",vfont=c("sans serif", "bold"))
-map('world2Hires', 'Canada', fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3")
-map('world2Hires', 'usa',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'USSR',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Japan',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Mexico',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'China',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
-mtext("NPGO regr. SSTa 1950-1988", cex=0.8)
-
-z <- rep(NA, ncol(SST))
-z[!land] <- npgo.sst.regr2
-z <- t(matrix(z, length(y.t)))  # Convert vector to matrix and transpose for plotting
-image.plot(x.t,y.t,z, col=new.col, zlim=c(lim[1], -lim[1]), ylim=c(20,68),
-           xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
-
-
-contour(x.t,y.t,z, add=T, col="grey",vfont=c("sans serif", "bold"))
-map('world2Hires', 'Canada', fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3")
-map('world2Hires', 'usa',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'USSR',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Japan',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Mexico',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'China',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
-mtext("NPGO regr. EOF2 1989-2102", cex=0.8)
-
-z <- rep(NA, ncol(SST))
-# z[!land] <- npgo.pattern1  # replace elements NOT corresponding to land with loadings!
-# z[!land] <- npgo.eof.r1  # replace elements NOT corresponding to land with loadings!
-z[!land] <- npgo.eof2.regr1  # replace elements NOT corresponding to land with loadings!
-
-z <- t(matrix(z, length(y.t)))  # Convert vector to matrix and transpose for plotting
-image.plot(x.t,y.t,z, col=new.col, zlim=c(lim[1], -lim[1]), ylim=c(20,68),
-           xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
-
-
-contour(x.t,y.t,z, add=T, col="grey",vfont=c("sans serif", "bold"))
-map('world2Hires', 'Canada', fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3")
-map('world2Hires', 'usa',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'USSR',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Japan',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Mexico',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'China',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
-mtext("NPGO regr. EOF2 1950-1988", cex=0.8)
-
-z <- rep(NA, ncol(SST))
-# z[!land] <- npgo.pattern2  # replace elements NOT corresponding to land with loadings!
-# z[!land] <- npgo.eof.r2
-z[!land] <- npgo.eof2.regr2
-z <- t(matrix(z, length(y.t)))  # Convert vector to matrix and transpose for plotting
-image.plot(x.t,y.t,z, col=new.col, zlim=c(lim[1], -lim[1]), ylim=c(20,68),
-           xlab = "", ylab = "", yaxt="n", xaxt="n", legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
-
-
-contour(x.t,y.t,z, add=T, col="grey",vfont=c("sans serif", "bold"))
-map('world2Hires', 'Canada', fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3")
-map('world2Hires', 'usa',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'USSR',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Japan',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'Mexico',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires', 'China',fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3") 
-map('world2Hires',fill=F, xlim=c(130,250), ylim=c(20,66),add=T, lwd=1)
-mtext("NPGO regr. EOF2 1989-2102", cex=0.8)
-
 ###
 # and SLP-PDO
 # reload SLP to make things easy...
-nc.slp <- nc_open("/Users/MikeLitzow 1/Documents/R/climate scripts/64AA9803F7345DFE8991A731014FFB01_ferret_listing.nc")
+nc.slp <- nc_open("/Users/MikeLitzow 1/Documents/R/climate scripts/monthly.SLP.full.N.Pac.NCEP.NCAR.nc")
 
 # now process SLP data - first, extract dates
 raw <- ncvar_get(nc.slp, "TIME")  # seconds since 1-1-1970
@@ -297,7 +141,7 @@ yr <- years(d)
 
 
 x <- ncvar_get(nc.slp, "LON53_101")
-y <- ncvar_get(nc.slp, "LAT45_69")
+y <- ncvar_get(nc.slp, "LAT45_65")
 
 # save to plot below
 x.slp <- x
@@ -509,6 +353,17 @@ lines(xx3, yy3, lwd=1.5, col="magenta")
 
 ###########################
 # get rolling regression coefficients for each square
+
+# define the squares
+xx1 <- c(183.5, 183.5, 204, 204, 183.5)
+yy1 <- c(46.5, 54, 54, 46.5, 46.5)
+
+xx2 <- c(196, 196, 216.5, 216.5, 196)
+yy2 <- c(39, 46.5, 46.5, 39, 39)
+
+xx3 <- c(194, 194, 199, 211, 216.5, 216.5, 194)
+yy3 <- c(51.5, 54, 56.5, 61.5, 61.5, 51.5, 51.5)
+
 
 PDOkeep1 <- PDOkeep2 <- NPGOkeep <- NA
 pdoSLP1 <- pdoSLP2 <- npgoSLP <- SLPsm
