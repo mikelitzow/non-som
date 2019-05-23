@@ -393,7 +393,7 @@ mtext("b", adj=0.05, line=-1.4, cex=1)
 z <- SLPsd.diff   
 lim <- range(z)
 z <- t(matrix(z, length(y)))  # Convert vector to matrix and transpose for plotting
-image.plot(x,y,z, col=my.col, xlab = "", ylab = "", zlim=c(-lim[2], lim[2]), ylim=c(20,70), yaxt="n", xaxt="n",
+image.plot(x,y,z, col=new.col, xlab = "", ylab = "", zlim=c(-lim[2], lim[2]), ylim=c(20,70), yaxt="n", xaxt="n",
            legend.mar=l.mar, legend.line=l.l, axis.args=list(cex.axis=l.cex, tcl=tc.l, mgp=c(3,0.3,0)))
 contour(x,y,z, add=T, col="white",vfont=c("sans serif", "bold"))
 map('world2Hires', 'Canada', fill=T,xlim=c(130,250), ylim=c(20,70),add=T, lwd=0.5, col="darkgoldenrod3")
