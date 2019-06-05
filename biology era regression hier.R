@@ -9,6 +9,9 @@ library(glmmTMB)
 library(rstanarm)
 library(lme4)
 library(rstan)
+library(ggthemes)
+library(tidybayes)
+library(cowplot)
 
 # load pdo/npgo 
 # download PDO / NPGO and process
@@ -191,3 +194,73 @@ npgo.plot <- ggplot(npgo.data, aes(ratio/100)) +
 png("biol regression change pdo-npgo slope.png", 7, 7, units="in", res=300)
 ggarrange(pdo.plot, npgo.plot, ncol=2)
 dev.off()
+
+
+# Caterpillar Plot ===============================
+# Helper Functions
+q.50 <- function(x) { return(quantile(x, probs=c(0.25,0.75))) }
+q.95 <- function(x) { return(quantile(x, probs=c(0.025,0.975))) }
+
+head(npgo.data)
+head(pdo.data)
+
+# Combine dataframes
+npgo.data$var <- "NPGO"
+pdo.data$var <- "PDO"
+all.data <- rbind(pdo.data, npgo.data)
+
+cat.plt <- ggplot(all.data, aes(x=system, y=ratio/100, fill=system)) +
+             theme_linedraw() +
+             # scale_fill_colorblind() +
+             scale_fill_tableau() +
+             # scale_fill_brewer(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")) +
+             # geom_eye() +
+
+             geom_violin(alpha = 0.75, lwd=0.1, scale='width') +
+             stat_summary(fun.y="q.95", colour="black", geom="line", lwd=0.75) +
+             stat_summary(fun.y="q.50", colour="black", geom="line", lwd=1.5) +
+             stat_summary(fun.y="median", colour="black", size=2, geom="point", pch=21) +
+             facet_wrap(~var, ncol=1) +
+             ylab("Avg ratio: Era 1 slope / Era 2 slope") +
+             theme(axis.text.y = element_blank()) +
+             coord_flip(ylim=c(0,7))
+             
+cat.plt
+ggsave("biol regression change pdo-npgo slope_cater.png", plot=cat.plt, 
+         height=7, width=7, units="in", dpi=300)
+
+# Separate by 
+
+cat.plt.pdo <- all.data %>% filter(var=='PDO') %>% ggplot(aes(x=system, y=ratio/100, fill=system)) +
+  theme_linedraw() +
+  scale_fill_tableau() +
+  # geom_eye() +
+  geom_violin(alpha = 0.75, lwd=0.1, scale='width') +
+  stat_summary(fun.y="q.95", colour="black", geom="line", lwd=0.75) +
+  stat_summary(fun.y="q.50", colour="black", geom="line", lwd=1.5) +
+  stat_summary(fun.y="median", colour="black", size=2, geom="point", pch=21) +
+  facet_wrap(~var, ncol=1) +
+  ylab("Avg ratio: Era 1 slope / Era 2 slope") +
+  theme(axis.text.y = element_blank(), legend.position='top') +
+  coord_flip(ylim=c(0,3))
+
+cat.plt.npgo <- all.data %>% filter(var=='NPGO') %>% ggplot(aes(x=system, y=ratio/100, fill=system)) +
+  theme_linedraw() +
+  scale_fill_tableau() +
+  # geom_eye() +
+  geom_violin(alpha = 0.75, lwd=0.1, scale='width') +
+  stat_summary(fun.y="q.95", colour="black", geom="line", lwd=0.75) +
+  stat_summary(fun.y="q.50", colour="black", geom="line", lwd=1.5) +
+  stat_summary(fun.y="median", colour="black", size=2, geom="point", pch=21) +
+  facet_wrap(~var, ncol=1) +
+  ylab("Avg ratio: Era 1 slope / Era 2 slope") +
+  theme(axis.text.y = element_blank(), legend.position="none") +
+  coord_flip(ylim=c(0,6))
+
+# Plot Combined with Sepearte 
+cat.plt.2 <- plot_grid(cat.plt.pdo, cat.plt.npgo, ncol=1, rel_heights = c(1.1,1))
+ggsave("biol regression change pdo-npgo slope_cater2.png", plot=cat.plt.2, 
+       height=7, width=7, units="in", dpi=300)
+
+  
+
