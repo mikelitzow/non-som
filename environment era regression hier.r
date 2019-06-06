@@ -254,7 +254,7 @@ cat.plt <- ggplot(all.data, aes(x=system, y=ratio/100, fill=system)) +
   facet_wrap(~var, ncol=1) +
   ylab("Avg ratio: Era 1 slope / Era 2 slope") +
   theme(axis.text.y = element_blank()) +
-  coord_flip(ylim=c(0,7))
+  coord_flip(ylim=c(0,9))
 
 cat.plt
 ggsave("env regression change pdo-npgo slope_cater.png", plot=cat.plt, 
@@ -286,9 +286,10 @@ cat.plt.npgo <- all.data %>% filter(var=='NPGO') %>% ggplot(aes(x=system, y=rati
   facet_wrap(~var, ncol=1) +
   ylab("Avg ratio: Era 1 slope / Era 2 slope") +
   theme(axis.text.y = element_blank(), legend.position="none") +
-  coord_flip(ylim=c(0,6))
+  coord_flip(ylim=c(0,9))
 
 # Plot Combined with Sepearte 
 cat.plt.2 <- plot_grid(cat.plt.pdo, cat.plt.npgo, ncol=1, rel_heights = c(1.1,1))
+cat.plt.2
 ggsave("env regression change pdo-npgo slope_cater2.png", plot=cat.plt.2, 
        height=7, width=7, units="in", dpi=300)
