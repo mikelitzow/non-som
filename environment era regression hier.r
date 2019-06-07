@@ -295,3 +295,28 @@ cat.plt.2 <- plot_grid(cat.plt.pdo, cat.plt.npgo, ncol=1, rel_heights = c(1.1,1)
 cat.plt.2
 ggsave("env regression change pdo-npgo slope_cater2.png", plot=cat.plt.2,
        height=7, width=7, units="in", dpi=300)
+
+
+#Plot: Facet by System =====================
+cat.plt.3 <- ggplot(all.data, aes(x=var, y=ratio/100, fill=var)) +
+  theme_linedraw() +
+  # scale_fill_colorblind() +
+  scale_fill_tableau() +
+  # scale_fill_brewer(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")) +
+  # geom_eye() +
+  
+  geom_violin(alpha = 0.75, lwd=0.1, scale='width') +
+  stat_summary(fun.y="q.95", colour="black", geom="line", lwd=0.75) +
+  stat_summary(fun.y="q.50", colour="black", geom="line", lwd=1.5) +
+  stat_summary(fun.y="median", colour="black", size=2, geom="point", pch=21) +
+  facet_wrap(~system, ncol=1, scales='free_y') +
+  ylab("Avg ratio: Era 1 slope / Era 2 slope") +
+  xlab("") +
+  theme(axis.text.y = element_blank(),
+        legend.position = 'top') +
+  geom_hline(aes(yintercept=1), color="red", linetype="dotted", size=1) +
+  coord_flip(ylim=c(0,7))
+
+cat.plt.3
+ggsave("env regression change pdo-npgo slope_cater3.png", plot=cat.plt.3, 
+       height=7, width=7, units="in", dpi=300)
