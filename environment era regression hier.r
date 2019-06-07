@@ -10,7 +10,7 @@ library(rstanarm)
 library(lme4)
 library(rstan)
 
-# load pdo/npgo 
+# load pdo/npgo
 download.file("http://jisao.washington.edu/pdo/PDO.latest", "~pdo")
 names <- read.table("~pdo", skip=30, nrows=1, as.is = T)
 pdo <- read.table("~pdo", skip=32, nrows=119, fill=T, col.names = names)
@@ -133,9 +133,9 @@ model.data = data.frame()
 levels.syst <- as.factor(unique(melted$system))
 
 for(s in levels.syst) {
-  
+
   # s <- levels.syst[1]
-  
+
   temp <- melted %>%
     filter(system==s)
   temp <- na.omit(temp)
@@ -146,21 +146,21 @@ for(s in levels.syst) {
                    n = nrow(temp),
                    n_levels = max(as.numeric(temp$variable)),
                    x = temp$scale_x)
-  
+
   mod = stan(file="mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
              pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio"),
              control=list(adapt_delta=0.99, max_treedepth=20))
-  
+
   pars = rstan::extract(mod,permuted=TRUE)
-  
+
   model.data = rbind(model.data,
                      data.frame(system=s, ratio=100*exp(pars$mu_ratio)))
-  
+
 }
 
 # order the systems north-south
-model.data$order <- ifelse(model.data$system=="EBS", 1, 
-                           ifelse(model.data$system=="GOA", 2, 
+model.data$order <- ifelse(model.data$system=="EBS", 1,
+                           ifelse(model.data$system=="GOA", 2,
                                   ifelse(model.data$system=="Northern CCE", 3,
                                          ifelse(model.data$system=="Central CCE", 4, 5))))
 model.data$system <- reorder(model.data$system, model.data$order)
@@ -174,16 +174,16 @@ pdo.plot <- ggplot(pdo.data, aes(ratio/100)) + # just removing % for now
   geom_density(fill=cb[3]) + xlab("Avg ratio: Era 1 slope / Era 2 slope") +
   facet_wrap(~system, ncol=1) +
   xlim(c(0,2)) +
-  geom_vline(xintercept = 1)+ 
+  geom_vline(xintercept = 1)+
   ggtitle("a) PDO")
 
 #################
 ## and the same thing for npgo
 model.data <- data.frame()
 for(s in levels.syst) {
-  
+
   # s <- levels.syst[1]
-  
+
   temp <- melted %>%
     filter(system==s)
   temp <- na.omit(temp)
@@ -194,21 +194,21 @@ for(s in levels.syst) {
                    n = nrow(temp),
                    n_levels = max(as.numeric(temp$variable)),
                    x = temp$scale_x)
-  
+
   mod = stan(file="mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
              pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio"),
              control=list(adapt_delta=0.99, max_treedepth=20))
-  
+
   pars = rstan::extract(mod,permuted=TRUE)
-  
+
   model.data = rbind(model.data,
                      data.frame(system=s, ratio=100*exp(pars$mu_ratio)))
-  
+
 }
 
 # order the systems north-south
-model.data$order <- ifelse(model.data$system=="EBS", 1, 
-                           ifelse(model.data$system=="GOA", 2, 
+model.data$order <- ifelse(model.data$system=="EBS", 1,
+                           ifelse(model.data$system=="GOA", 2,
                                   ifelse(model.data$system=="Northern CCE", 3,
                                          ifelse(model.data$system=="Central CCE", 4, 5))))
 model.data$system <- reorder(model.data$system, model.data$order)
@@ -219,7 +219,7 @@ npgo.plot <- ggplot(npgo.data, aes(ratio/100)) +
   theme_linedraw() +
   geom_density(fill=cb[3]) + xlab("Avg ratio: Era 1 slope / Era 2 slope") +
   facet_wrap(~system, ncol=1) +
-  geom_vline(xintercept=1) + 
+  geom_vline(xintercept=1) +
   xlim(c(0,4.5)) +
   ggtitle("b) NPGO")
 
@@ -246,7 +246,6 @@ cat.plt <- ggplot(all.data, aes(x=system, y=ratio/100, fill=system)) +
   scale_fill_tableau() +
   # scale_fill_brewer(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")) +
   # geom_eye() +
-  
   geom_violin(alpha = 0.75, lwd=0.1, scale='width') +
   stat_summary(fun.y="q.95", colour="black", geom="line", lwd=0.75) +
   stat_summary(fun.y="q.50", colour="black", geom="line", lwd=1.5) +
@@ -254,13 +253,14 @@ cat.plt <- ggplot(all.data, aes(x=system, y=ratio/100, fill=system)) +
   facet_wrap(~var, ncol=1) +
   ylab("Avg ratio: Era 1 slope / Era 2 slope") +
   theme(axis.text.y = element_blank()) +
+  geom_hline(aes(yintercept=1), color="red", linetype="dotted", size=1) +
   coord_flip(ylim=c(0,9))
 
 cat.plt
-ggsave("env regression change pdo-npgo slope_cater.png", plot=cat.plt, 
+ggsave("env regression change pdo-npgo slope_cater.png", plot=cat.plt,
        height=7, width=7, units="in", dpi=300)
 
-# Separate by 
+# Separate by
 
 cat.plt.pdo <- all.data %>% filter(var=='PDO') %>% ggplot(aes(x=system, y=ratio/100, fill=system)) +
   theme_linedraw() +
@@ -273,6 +273,7 @@ cat.plt.pdo <- all.data %>% filter(var=='PDO') %>% ggplot(aes(x=system, y=ratio/
   facet_wrap(~var, ncol=1) +
   ylab("Avg ratio: Era 1 slope / Era 2 slope") +
   theme(axis.text.y = element_blank(), legend.position='top') +
+  geom_hline(aes(yintercept=1), color="red", linetype="dotted", size=1) +
   coord_flip(ylim=c(0,3))
 
 cat.plt.npgo <- all.data %>% filter(var=='NPGO') %>% ggplot(aes(x=system, y=ratio/100, fill=system)) +
@@ -286,10 +287,11 @@ cat.plt.npgo <- all.data %>% filter(var=='NPGO') %>% ggplot(aes(x=system, y=rati
   facet_wrap(~var, ncol=1) +
   ylab("Avg ratio: Era 1 slope / Era 2 slope") +
   theme(axis.text.y = element_blank(), legend.position="none") +
+  geom_hline(aes(yintercept=1), color="red", linetype="dotted", size=1) +
   coord_flip(ylim=c(0,9))
 
-# Plot Combined with Sepearte 
+# Plot Combined with Sepearte
 cat.plt.2 <- plot_grid(cat.plt.pdo, cat.plt.npgo, ncol=1, rel_heights = c(1.1,1))
 cat.plt.2
-ggsave("env regression change pdo-npgo slope_cater2.png", plot=cat.plt.2, 
+ggsave("env regression change pdo-npgo slope_cater2.png", plot=cat.plt.2,
        height=7, width=7, units="in", dpi=300)
