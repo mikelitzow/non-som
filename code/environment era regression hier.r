@@ -9,6 +9,8 @@ library(glmmTMB)
 library(rstanarm)
 library(lme4)
 library(rstan)
+library(bayesplot)
+library(ggthemes)
 
 # load pdo/npgo
 download.file("http://jisao.washington.edu/pdo/PDO.latest", "~pdo")
@@ -32,7 +34,7 @@ win.npgo <- tapply(npgo$value, npgo$win.yr, mean)
 
 # there are five regions that we're looking at: CalCOFI/southern CCE, Farallon/central CCE, northern CCE, GOA, and EBS
 # load 'em!
-dat <- read.csv("ebs.env.dat.csv", row.names = 1)
+dat <- read.csv("data/ebs.env.dat.csv", row.names = 1)
 # add era term
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
@@ -50,7 +52,7 @@ m1$system <- "EBS"
 
 ####
 
-dat <- read.csv("goa.env.dat.csv", row.names = 1)
+dat <- read.csv("data/goa.env.dat.csv", row.names = 1)
 dat$year <- rownames(dat)
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 dat$year <- as.numeric(dat$year)
@@ -69,7 +71,7 @@ m2$system <- "GOA"
 
 #########
 
-dat <- read.csv("cce.env.dat.csv", row.names = 1)
+dat <- read.csv("data/cce.env.dat.csv", row.names = 1)
 
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
@@ -87,7 +89,7 @@ m3$system <- "Central CCE"
 
 ###################
 
-dat <- read.csv("calcofi.phys.gam.csv", row.names = 1)
+dat <- read.csv("data/calcofi.phys.gam.csv", row.names = 1)
 
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
@@ -105,7 +107,7 @@ m4$system <- "Southern CCE"
 
 ###########################
 
-dat <- read.csv("ncc.env.dat.csv", row.names = 1)
+dat <- read.csv("data/ncc.env.dat.csv", row.names = 1)
 
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
@@ -129,7 +131,7 @@ melted$variable <- as.factor(melted$variable)
 melted$variable_era <- as.factor(melted$variable_era)
 
 model.data = data.frame()
-
+betas = data.frame()
 levels.syst <- as.factor(unique(melted$system))
 
 for(s in levels.syst) {
@@ -140,6 +142,16 @@ for(s in levels.syst) {
     filter(system==s)
   temp <- na.omit(temp)
   # create data for stan
+  temp$variable = as.character(temp$variable)
+  temp$variable = as.factor(temp$variable)
+
+  # rescale pdo
+  #scale_y = group_by(temp, year) %>%
+  #  dplyr::summarize(y = pdo[1]) %>% ungroup %>%
+  #  dplyr::mutate(scale_y = scale(y)) %>%
+  #  dplyr::select(-y)
+  #temp = dplyr::left_join(temp, scale_y)
+
   stan_data = list(era = as.numeric(temp$era),
                    y = temp$pdo,
                    variable = as.numeric(temp$variable),
@@ -147,22 +159,57 @@ for(s in levels.syst) {
                    n_levels = max(as.numeric(temp$variable)),
                    x = temp$scale_x)
 
-  mod = stan(file="mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
-             pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio"),
+  mod = stan(file="models/mod.stan", data=stan_data, chains=1, warmup=4000, iter=6000,thin=2,
+             pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio",
+               "exp_mu_ratio","exp_ratio","pred"),
              control=list(adapt_delta=0.99, max_treedepth=20))
 
   pars = rstan::extract(mod,permuted=TRUE)
 
   model.data = rbind(model.data,
-                     data.frame(system=s, ratio=100*exp(pars$mu_ratio)))
+                     data.frame(system=unique(melted$system)[s],
+                       ratio=100*exp(pars$mu_ratio)))
+
+  temp$pred = apply(pars$pred,2,mean)
+
+  png(file=paste0("plots/diag/obspred_SI_PDO_",s,".png"))
+  g = ggplot(temp, aes(year,pdo,col=era)) + geom_point() +
+    facet_wrap(~ variable, scale="free_y") + geom_line(aes(year,pred)) +
+    ggtitle(paste0("PDO: Region ",s))
+  print(g)
+  dev.off()
+
+  png(file=paste0("plots/diag/slopes_SI_PDO_",s,".png"))
+  g = ggplot(temp, aes(scale_x,pred,col=era)) + geom_point() +
+    facet_wrap(~ variable, scale="free") + xlab("Covariate") +
+    ylab("Predicted") + ggtitle(paste0("PDO: Region ",s))
+  print(g)
+  dev.off()
+
+  # create an array for caterpillar plots by variable
+  draws = rstan::extract(mod,permuted=FALSE)
+  par_names = dimnames(draws)$parameters
+  par_names[grep("exp_mu_ratio", par_names)] = "global mean"
+  par_names[grep("exp_ratio", par_names)] = levels(temp$variable)
+  dimnames(draws)$parameters = par_names
+  idx = which(par_names %in% c("global mean",levels(temp$variable)))
+
+  png(paste0(file="plots/SI_PDO_",s,".png"))
+  g = mcmc_intervals(draws,
+    pars = c("global mean",levels(temp$variable))) +
+    geom_vline(xintercept=1,col="red",linetype="dashed") +
+    ggtitle(paste0("PDO: Region ",s)) +
+    xlab("Avg ratio: Era 1 slope / Era 2 slope") +
+    theme_linedraw()
+  print(g)
+  dev.off()
 
 }
 
 # order the systems north-south
-model.data$order <- ifelse(model.data$system=="EBS", 1,
-                           ifelse(model.data$system=="GOA", 2,
-                                  ifelse(model.data$system=="Northern CCE", 3,
-                                         ifelse(model.data$system=="Central CCE", 4, 5))))
+# order the systems north-south
+model.data$order <- match(model.data$system,
+  c("EBS","GOA","Northern CCE","Central CCE","Central CCE"))
 model.data$system <- reorder(model.data$system, model.data$order)
 
 cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
@@ -180,6 +227,7 @@ pdo.plot <- ggplot(pdo.data, aes(ratio/100)) + # just removing % for now
 #################
 ## and the same thing for npgo
 model.data <- data.frame()
+
 for(s in levels.syst) {
 
   # s <- levels.syst[1]
@@ -187,6 +235,16 @@ for(s in levels.syst) {
   temp <- melted %>%
     filter(system==s)
   temp <- na.omit(temp)
+  temp$variable = as.character(temp$variable)
+  temp$variable = as.factor(temp$variable)
+
+  # rescale pdo
+  #scale_y = group_by(temp, year) %>%
+  #  dplyr::summarize(y = npgo[1]) %>% ungroup %>%
+  #  dplyr::mutate(scale_y = scale(y)) %>%
+  #  dplyr::select(-y)
+  #temp = dplyr::left_join(temp, scale_y)
+
   # create data for stan
   stan_data = list(era = as.numeric(temp$era),
                    y = temp$npgo,
@@ -195,8 +253,9 @@ for(s in levels.syst) {
                    n_levels = max(as.numeric(temp$variable)),
                    x = temp$scale_x)
 
-  mod = stan(file="mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
-             pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio"),
+  mod = stan(file="models/mod.stan", data=stan_data, chains=3, warmup=4000, iter=6000,thin=2,
+    pars = c("beta","mu_beta","ratio","mu_ratio","sigma_beta","sigma_ratio",
+      "exp_mu_ratio","exp_ratio","pred"),
              control=list(adapt_delta=0.99, max_treedepth=20))
 
   pars = rstan::extract(mod,permuted=TRUE)
@@ -204,13 +263,44 @@ for(s in levels.syst) {
   model.data = rbind(model.data,
                      data.frame(system=s, ratio=100*exp(pars$mu_ratio)))
 
+  temp$pred = apply(pars$pred,2,mean)
+
+  png(file=paste0("plots/diag/obspred_SI_NPGO_",s,".png"))
+  g = ggplot(as.data.frame(temp), aes(year,npgo,col=era)) + geom_point() +
+    facet_wrap(~ variable, scale="free_y") + geom_line(aes(year,pred)) +
+    ggtitle(paste0("NPGO: Region ",s))
+  print(g)
+  dev.off()
+
+  png(file=paste0("plots/diag/slopes_SI_NPGO_",s,".png"))
+  g = ggplot(temp, aes(scale_x,pred,col=era)) + geom_point() +
+    facet_wrap(~ variable, scale="free") + xlab("Covariate") +
+    ylab("Predicted") + ggtitle(paste0("NPGO: Region ",s))
+  print(g)
+  dev.off()
+
+  # create an array for caterpillar plots by variable
+  draws = rstan::extract(mod,permuted=FALSE)
+  par_names = dimnames(draws)$parameters
+  par_names[grep("exp_mu_ratio", par_names)] = "global mean"
+  par_names[grep("exp_ratio", par_names)] = levels(temp$variable)
+  dimnames(draws)$parameters = par_names
+  idx = which(par_names %in% c("global mean",levels(temp$variable)))
+
+  png(paste0(file="plots/SI_NPGO_",s,".png"))
+  g = mcmc_intervals(draws,
+    pars = c("global mean",levels(temp$variable))) +
+    geom_vline(xintercept=1,col="red",linetype="dashed") +
+    ggtitle(paste0("NPGO: Region ",s)) +
+    xlab("Avg ratio: Era 1 slope / Era 2 slope") +
+    theme_linedraw()
+  print(g)
+  dev.off()
 }
 
 # order the systems north-south
-model.data$order <- ifelse(model.data$system=="EBS", 1,
-                           ifelse(model.data$system=="GOA", 2,
-                                  ifelse(model.data$system=="Northern CCE", 3,
-                                         ifelse(model.data$system=="Central CCE", 4, 5))))
+model.data$order <- match(model.data$system,
+  c("EBS","GOA","Northern CCE","Central CCE","Central CCE"))
 model.data$system <- reorder(model.data$system, model.data$order)
 
 npgo.data <- model.data
@@ -304,7 +394,7 @@ cat.plt.3 <- ggplot(all.data, aes(x=var, y=ratio/100, fill=var)) +
   scale_fill_tableau() +
   # scale_fill_brewer(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")) +
   # geom_eye() +
-  
+
   geom_violin(alpha = 0.75, lwd=0.1, scale='width') +
   stat_summary(fun.y="q.95", colour="black", geom="line", lwd=0.75) +
   stat_summary(fun.y="q.50", colour="black", geom="line", lwd=1.5) +
@@ -318,5 +408,5 @@ cat.plt.3 <- ggplot(all.data, aes(x=var, y=ratio/100, fill=var)) +
   coord_flip(ylim=c(0,7))
 
 cat.plt.3
-ggsave("env regression change pdo-npgo slope_cater3.png", plot=cat.plt.3, 
+ggsave("env regression change pdo-npgo slope_cater3.png", plot=cat.plt.3,
        height=7, width=7, units="in", dpi=300)

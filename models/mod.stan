@@ -17,7 +17,9 @@ parameters {
 }
 transformed parameters {
   vector[n_levels] exp_ratio;
+  real exp_mu_ratio;
   vector[n] pred;
+  exp_mu_ratio = exp(mu_ratio);
   for(i in 1:n_levels) {exp_ratio[i] = exp(ratio[i]);}
   for(i in 1:n) {
     if(era[i]==1) {
