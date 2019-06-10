@@ -12,7 +12,7 @@ options(max.print = 99999)
 
 #write.csv(run.dat, "salmon run dat.csv")
 
-run.dat <- read.csv("salmon run dat.csv", row.names = 1)
+run.dat <- read.csv("data/salmon run dat.csv", row.names = 1)
 
 # load pdo and npgo
 download.file("http://jisao.washington.edu/pdo/PDO.latest", "~pdo")
