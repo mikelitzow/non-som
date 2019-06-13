@@ -55,7 +55,7 @@ melted$variable_era = paste0(melted$era,melted$variable)
 # standardize all the time series by variable -- so slopes are on same scale
 m1 = dplyr::group_by(melted, variable) %>%
   mutate(scale_x = scale(value))
-m1$system <- "Farallon seabirds"
+m1$system <- "Central California Current"
 
 ####
 # CalCOFI
@@ -73,7 +73,7 @@ melted$variable_era = paste0(melted$era,melted$variable)
 # standardize all the time series by variable -- so slopes are on same scale
 m2 = dplyr::group_by(melted, variable) %>%
   mutate(scale_x = scale(value))
-m2$system <- "CalCOFI ichthyoplankton"
+m2$system <- "Southern California Current"
 
 #########
 dat <- read.csv("data/goa.biol.csv")
@@ -90,7 +90,7 @@ melted$variable_era = paste0(melted$era,melted$variable)
 # standardize all the time series by variable -- so slopes are on same scale
 m3 = dplyr::group_by(melted, variable) %>%
   mutate(scale_x = scale(value))
-m3$system <- "GOA fish & crustaceans"
+m3$system <- "Gulf of Alaska"
 
 #######
 dat <- read.csv("data/ebs.biol.data.csv")
@@ -109,13 +109,13 @@ melted$value <- as.numeric(melted$value)
 # standardize all the time series by variable -- so slopes are on same scale
 m4 = dplyr::group_by(melted, variable) %>%
   mutate(scale_x = scale(value))
-m3$system <- "GOA fish & crustaceans"
+m4$system <- "Bering Sea"
 
 
 #######
 # combine
 
-melted <- rbind(m1, m2, m3)
+melted <- rbind(m1, m2, m3, m4)
 melted$year <- as.numeric(melted$year)
 melted$variable <- as.factor(melted$variable)
 melted$variable_era <- as.factor(melted$variable_era)
@@ -191,21 +191,17 @@ for(s in levels.syst) {
 }
 
 # order the systems north-south
-model.data$order <- ifelse(model.data$system=="GOA fish & crustaceans", 1,
-                           ifelse(model.data$system=="Farallon seabirds", 2, 3))
+model.data$order <- ifelse(model.data$system=="Bering Sea", 1,
+                           ifelse(model.data$system=="Gulf of Alaska", 2, 
+                                  ifelse(model.data$system=="Central California Current"), 3, 4))
 model.data$system <- reorder(model.data$system, model.data$order)
 
 cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 pdo.data <- model.data
 
-pdo.plot <- ggplot(pdo.data, aes(ratio/100)) + # just removing % for now
-  theme_linedraw() +
-  geom_density(fill=cb[3]) + xlab("Avg ratio: Era 1 slope / Era 2 slope") +
-  facet_wrap(~system, ncol=1) +
-  xlim(c(0,2)) +
-  geom_vline(xintercept = 1)+
-  ggtitle("a) PDO")
+# save for future reference
+write.csv(pdo.data, "models/pdo_biology_model_data.csv")
 
 #################
 ## and the same thing for npgo
@@ -274,24 +270,15 @@ for(s in levels.syst) {
 }
 
 # order the systems north-south
-model.data$order <- ifelse(model.data$system=="GOA fish & crustaceans", 1,
-                           ifelse(model.data$system=="Farallon seabirds", 2, 3))
+model.data$order <- ifelse(model.data$system=="Bering Sea", 1,
+                           ifelse(model.data$system=="Gulf of Alaska", 2, 
+                                  ifelse(model.data$system=="Central California Current"), 3, 4))
 model.data$system <- reorder(model.data$system, model.data$order)
 
 npgo.data <- model.data
 
-npgo.plot <- ggplot(npgo.data, aes(ratio/100)) +
-  theme_linedraw() +
-  geom_density(fill=cb[3]) + xlab("Avg ratio: Era 1 slope / Era 2 slope") +
-  facet_wrap(~system, ncol=1) +
-  geom_vline(xintercept=1) +
-  xlim(c(0,4.5)) +
-  ggtitle("b) NPGO")
-
-png("biol regression change pdo-npgo slope.png", 7, 7, units="in", res=300)
-ggarrange(pdo.plot, npgo.plot, ncol=2)
-dev.off()
-
+# save for future reference
+write.csv(npgo.data, "models/npgo_biology_model_data.csv")
 
 # Caterpillar Plot ===============================
 # Helper Functions
