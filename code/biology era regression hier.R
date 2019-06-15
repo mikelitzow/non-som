@@ -39,7 +39,7 @@ win.npgo <- tapply(npgo$value, npgo$win.yr, mean)
 win.npgo <- rollapply(win.npgo, 2, mean, align="right", fill=NA)
 names(win.npgo) <- 1950:2019
 win.pdo <- rollapply(win.pdo, 2, mean, align="right", fill=NA)
-names(win.odo) <- 1900:2019
+names(win.pdo) <- 1900:2019
 
 # load four "non-salmon" data sets: EBS groundfish recruitment, GOA crustaceans/fish, Farallon seabirds, CalCOFI ichthyo
 dat <- read.csv("data/farallon.sbrd.biol.csv", row.names = 1)
@@ -187,7 +187,7 @@ for(s in levels.syst) {
   pars = rstan::extract(mod,permuted=TRUE)
 
   model.data = rbind(model.data,
-    data.frame(system=unique(melted$system)[s],
+    data.frame(system=s,
       ratio=100*exp(pars$mu_ratio)))
 
   temp$pred = apply(pars$pred,2,mean)
@@ -226,10 +226,16 @@ for(s in levels.syst) {
 
 }
 
+# add a placeholder 
+placeholder <- data.frame(system="Northern California Current", ratio=NA)
+model.data <- rbind(model.data, placeholder)
+
 # order the systems north-south
 model.data$order <- ifelse(model.data$system=="Bering Sea", 1,
                            ifelse(model.data$system=="Gulf of Alaska", 2, 
-                                  ifelse(model.data$system=="Central California Current", 3, 4)))
+                                  ifelse(model.data$system=="Northern California Current", 3, 
+                                         ifelse(model.data$system=="Central California Current", 4, 5))))
+
 model.data$system <- reorder(model.data$system, model.data$order)
 
 pdo.data <- model.data
@@ -303,11 +309,16 @@ for(s in levels.syst) {
   dev.off()
 }
 
+# add a placeholder 
+placeholder <- data.frame(system="Northern California Current", ratio=NA)
+model.data <- rbind(model.data, placeholder)
 
 # order the systems north-south
 model.data$order <- ifelse(model.data$system=="Bering Sea", 1,
                            ifelse(model.data$system=="Gulf of Alaska", 2, 
-                                  ifelse(model.data$system=="Central California Current", 3, 4)))
+                                  ifelse(model.data$system=="Northern California Current", 3, 
+                                         ifelse(model.data$system=="Central California Current", 4, 5))))
+
 model.data$system <- reorder(model.data$system, model.data$order)
 
 npgo.data <- model.data
@@ -327,25 +338,35 @@ head(pdo.data)
 npgo.data$var <- "NPGO"
 pdo.data$var <- "PDO"
 all.data <- rbind(pdo.data, npgo.data)
+all.data$var.order <- ifelse(all.data$var=="PDO", 1, 2)
+all.data$var <- reorder(all.data$var, all.data$var.order)
+all.data$log.ratio <- log(all.data$ratio/100, 10)
 
-cat.plt <- ggplot(all.data, aes(x=system, y=ratio/100, fill=system)) +
+# colorblind...
+cb <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+biol.plt <- ggplot(all.data, aes(x=reorder(system, desc(system)), y=log.ratio, fill=system)) +
              theme_linedraw() +
+            scale_fill_manual(values=cb[c(6,3,4,2,8)], 
+                              labels=c("Bering Sea", "Gulf of Alaska", "Central Cal. Curr.", "Southern Cal. Curr.")) +
              # scale_fill_colorblind() +
-             scale_fill_tableau() +
+             # scale_fill_tableau() +
              # scale_fill_brewer(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")) +
              # geom_eye() +
-
+  
              geom_violin(alpha = 0.75, lwd=0.1, scale='width') +
              stat_summary(fun.y="q.95", colour="black", geom="line", lwd=0.75) +
              stat_summary(fun.y="q.50", colour="black", geom="line", lwd=1.5) +
              stat_summary(fun.y="median", colour="black", size=2, geom="point", pch=21) +
              facet_wrap(~var, ncol=1) +
-             ylab("Avg ratio: Era 1 slope / Era 2 slope") +
-             theme(axis.text.y = element_blank()) +
-             geom_hline(aes(yintercept=1), color="red", linetype="dotted", size=1) +
-             coord_flip(ylim=c(0,7))
+             ylab("Log ratio: Era 1 slope / Era 2 slope") +
+             theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_line(size=0),
+                   legend.title = element_blank(), legend.position = c(0.15, 0.15)) +
+             geom_hline(aes(yintercept=0), color="red", linetype="dotted", size=1) +
+             coord_flip(ylim=c()) 
+              
 
-cat.plt
+biol.plt
 ggsave("biol regression change pdo-npgo slope_cater.png", plot=cat.plt,
          height=7, width=7, units="in", dpi=300)
 
