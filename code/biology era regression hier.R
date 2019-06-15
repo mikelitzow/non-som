@@ -36,18 +36,28 @@ npgo$win.yr <- ifelse(npgo$month %in% 11:12, npgo$Year+1, npgo$Year)
 win.npgo <- tapply(npgo$value, npgo$win.yr, mean)
 
 # and smoothed (2yr) values of each
-npgo2 <- rollapply(win.npgo, 2, mean, align="right", fill=NA)
-pdo2 <- rollapply(win.pdo, 2, mean, align="right", fill=NA)
-names(pdo2) <- 1900:2019
+win.npgo <- rollapply(win.npgo, 2, mean, align="right", fill=NA)
+names(win.npgo) <- 1950:2019
+win.pdo <- rollapply(win.pdo, 2, mean, align="right", fill=NA)
+names(win.odo) <- 1900:2019
 
 # load four "non-salmon" data sets: EBS groundfish recruitment, GOA crustaceans/fish, Farallon seabirds, CalCOFI ichthyo
 dat <- read.csv("data/farallon.sbrd.biol.csv", row.names = 1)
+
+# examine distributions
+look <- dat %>%
+  gather(key, value, -year)
+
+ggplot(look, aes(value)) +
+  geom_histogram() +
+  facet_wrap(~key, scales="free")
+
 # add era term
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
 # and pdo/npgo
-dat$pdo <- pdo2[match(dat$year, names(pdo2))]
-dat$npgo <- npgo2[match(dat$year, names(npgo2))]
+dat$pdo <- win.pdo[match(dat$year, names(win.pdo))]
+dat$npgo <- win.npgo[match(dat$year, names(win.npgo))]
 
 # reshape with year, era, and pdo and npgo as the grouping variables
 melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
@@ -61,11 +71,19 @@ m1$system <- "Central California Current"
 # CalCOFI
 dat <- read.csv("data/calcofi.biol.csv", row.names=1)
 
+# examine distributions
+look <- dat %>%
+  gather(key, value, -year)
+
+ggplot(look, aes(value)) +
+  geom_histogram() +
+  facet_wrap(~key, scales="free")
+
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
 # and pdo/npgo
-dat$pdo <- pdo2[match(dat$year, names(pdo2))]
-dat$npgo <- npgo2[match(dat$year, names(npgo2))]
+dat$pdo <- win.pdo[match(dat$year, names(win.pdo))]
+dat$npgo <- win.npgo[match(dat$year, names(win.npgo))]
 
 # reshape with year, era, and pdo and npgo as the grouping variables
 melted <- melt(dat, id.vars = c("year","pdo","era","npgo"))
@@ -78,6 +96,15 @@ m2$system <- "Southern California Current"
 #########
 dat <- read.csv("data/goa.biol.csv")
 colnames(dat)[1] <- "year"
+
+# examine distributions
+look <- dat %>%
+  gather(key, value, -year)
+
+ggplot(look, aes(value)) +
+  geom_histogram() +
+  facet_wrap(~key, scales="free")
+
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
 # and pdo/npgo
@@ -94,6 +121,15 @@ m3$system <- "Gulf of Alaska"
 
 #######
 dat <- read.csv("data/ebs.biol.data.csv")
+dat[,2:5] <- sqrt(dat[,2:5])
+
+# examine distributions
+look <- dat %>%
+  gather(key, value, -year)
+
+ggplot(look, aes(value)) +
+  geom_histogram() +
+  facet_wrap(~key, scales="free")
 
 dat$era <- as.factor(ifelse(dat$year <= 1988, 1, 2))
 
@@ -193,10 +229,8 @@ for(s in levels.syst) {
 # order the systems north-south
 model.data$order <- ifelse(model.data$system=="Bering Sea", 1,
                            ifelse(model.data$system=="Gulf of Alaska", 2, 
-                                  ifelse(model.data$system=="Central California Current"), 3, 4))
+                                  ifelse(model.data$system=="Central California Current", 3, 4)))
 model.data$system <- reorder(model.data$system, model.data$order)
-
-cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 pdo.data <- model.data
 
@@ -269,10 +303,11 @@ for(s in levels.syst) {
   dev.off()
 }
 
+
 # order the systems north-south
 model.data$order <- ifelse(model.data$system=="Bering Sea", 1,
                            ifelse(model.data$system=="Gulf of Alaska", 2, 
-                                  ifelse(model.data$system=="Central California Current"), 3, 4))
+                                  ifelse(model.data$system=="Central California Current", 3, 4)))
 model.data$system <- reorder(model.data$system, model.data$order)
 
 npgo.data <- model.data
